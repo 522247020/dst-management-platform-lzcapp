@@ -14,9 +14,9 @@ application:
       description: 饥荒主服务器端口（DMP 默认从 21001 起分配）
       service: dmp
       publish_port: 21000-21100
-
 services:
   dmp:
+    # upstream: ghcr.io/miracleeverywhere/dst-management-platform-api:v3.2.2
     image: ghcr.io/miracleeverywhere/dst-management-platform-api:v3.2.2
     environment:
       - TZ=Asia/Shanghai
