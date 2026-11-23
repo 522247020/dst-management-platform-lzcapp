@@ -138,6 +138,11 @@ ssh <box> 'lpk-manager install /tmp/dmp.lpk'
 
 已知冲突：官方商店里 `cloud.lazycat.app.dmp` 已被其他开发者占用（v2.1.1，2025-08），所以本包改用 `cloud.lazycat.app.dmp3`。
 
+### 两个坑（都踩过）
+
+1. **Release Asset 是商店的交付源**：同一版本再次运行时，工作流会下载 `releases/download/v<version>/<package>-v<version>.lpk` 校验后直接提交商店，不会用当次构建的新包。所以只改 `package.yml`（比如补 `unsupported_platforms`）而版本不变时，必须 `gh release upload v<version> <new.lpk> --clobber` 把新包替换上去，否则商店拿到的还是旧包。
+2. **审核未结束时不会重复提交**：守门逻辑会让自动发布停在 `official-review-pending`（审核版本与候选相同或更新）。这是保护不是失败；审核被驳回后，下一次运行会自动重建并重新提审。
+
 ### Gitea 版本
 
 `docs/gitea-actions/build-lpk.yml` 是 Gitea Actions 的 composite 版（check → 提交 → build → `akkuman/gitea-release-action`，可选 `lzc-cli` 装盒），放在 `docs/` 下不会被误触发。经验值：
