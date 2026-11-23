@@ -21,6 +21,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # 可选：把 Action 二进制镜像到内网（Gitea 变量），留空则用 GitHub Release
+      LAZYCAT_ACTION_RELEASE_BASE_URL: ${{ vars.LAZYCAT_ACTION_RELEASE_BASE_URL }}
     steps:
       - name: 检出仓库
         uses: actions/checkout@v4
