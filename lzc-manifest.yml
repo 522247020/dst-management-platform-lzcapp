@@ -24,7 +24,6 @@ application:
         const password = pick(payload.password, payload.Password, payload.newPassword);
         if (username) ctx.flow.set("dmp.username", username);
         if (password) ctx.flow.set("dmp.password", password);
-
     # response：只有业务成功（code=200）才落盘，避免失败请求污染
     - id: dmp-commit-credentials
       auth_required: false
@@ -43,7 +42,6 @@ application:
         const password = ctx.flow.get("dmp.password");
         if (typeof username === "string" && username) ctx.persist.set("dmp.username", username);
         if (typeof password === "string" && password) ctx.persist.set("dmp.password", password);
-
     # browser：登录页自动填充并自动提交
     - id: dmp-login-autofill
       when:
@@ -59,7 +57,6 @@ application:
             passwordSelector: input[autocomplete="password"]
             autoSubmit: true
             submitDelayMs: 500
-
     # ---------- 文件拦截（网盘打开/保存）----------
     # 同源文件桥：把 /__lazycat_file_bridge/* 转发到当前微服的网盘服务
     - id: lazycat-file-bridge
@@ -90,7 +87,6 @@ application:
           timeout_ms: 120000,
           on_fail: "error",
         });
-
     # browser：接管 <input type=file>、showOpenFilePicker/showSaveFilePicker、blob 下载链接
     - id: lazycat-file-chooser
       on: browser
@@ -103,7 +99,6 @@ application:
             fileBridgeRoot: /__lazycat_file_bridge
             fallbackMime: application/octet-stream
             locale: auto
-
   # DST 世界端口与主服务器端口按 UDP 对外转发。
   # 不写 port 时，外部入站端口号原样转发到容器内同名端口，DMP 的端口规划才能成立。
   ingress:
@@ -118,7 +113,7 @@ application:
 services:
   dmp:
     # upstream: ghcr.io/miracleeverywhere/dst-management-platform-api:v3.2.2
-    image: ghcr.io/miracleeverywhere/dst-management-platform-api:v3.2.2
+    image: registry.lazycat.cloud/mhwy/miracleeverywhere/dst-management-platform-api:794c7379418e6f9e
     environment:
       - TZ=Asia/Shanghai
       - DMP_PORT=80
