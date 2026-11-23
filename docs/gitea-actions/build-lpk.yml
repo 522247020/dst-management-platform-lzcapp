@@ -71,7 +71,7 @@ jobs:
           CHANGELOG: ${{ steps.build.outputs.changelog }}
         run: |
           set -euo pipefail
-          asset="dist/community.lazycat.app.dmp-v${VERSION}.lpk"
+          asset="dist/cloud.lazycat.app.dmp3-v${VERSION}.lpk"
           cp "$LPK_PATH" "$asset"
           echo "LPK: $asset"
           echo "SHA256: ${{ steps.build.outputs.sha256 }}"
@@ -96,7 +96,7 @@ jobs:
           body_path: dist/release-notes.md
           target_commitish: ${{ github.ref_name }}
           files: |
-            dist/community.lazycat.app.dmp-v${{ steps.build.outputs.version }}.lpk
+            dist/cloud.lazycat.app.dmp3-v${{ steps.build.outputs.version }}.lpk
           sha256sum: true
 
       # 可选：配置了 LAZYCAT_BOX_HOST / LAZYCAT_BOX_SSH_KEY 时自动安装到微服
@@ -122,4 +122,4 @@ jobs:
           address="${BOX_HOST}"
           if [ -n "${BOX_PORT}" ]; then address="${BOX_HOST}:${BOX_PORT}"; fi
           lzc-cli box add-by-ssh "${BOX_USER:-root}" "${address}"
-          lzc-cli lpk install "dist/community.lazycat.app.dmp-v${VERSION}.lpk" --apk n
+          lzc-cli lpk install "dist/cloud.lazycat.app.dmp3-v${VERSION}.lpk" --apk n

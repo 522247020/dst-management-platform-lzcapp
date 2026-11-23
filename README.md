@@ -2,7 +2,7 @@
 
 把 [miracleEverywhere/dst-management-platform-api](https://github.com/miracleEverywhere/dst-management-platform-api) 打包成懒猫微服 LPK，并用 GitHub Actions 自动跟随上游镜像版本发布。
 
-- 包名：`community.lazycat.app.dmp`（`cloud.lazycat.app.dmp` 已被别人占用）
+- 包名：`cloud.lazycat.app.dmp3`（`cloud.lazycat.app.dmp` 已被别人占用）
 - 仓库：<https://github.com/522247020/dst-management-platform-lzcapp>
 - 本地开发目录：`~/Code/dst-management-platform-lzcapp`
 - 子域名：`dmp.<微服域名>`，例如 `https://dmp.lc03test.heiyu.space`
@@ -135,7 +135,7 @@ ssh <box> 'lpk-manager install /tmp/dmp.lpk'
 
 需要仓库 Secret `LZC_API_TOKEN`（懒猫开发者平台 → 个人访问令牌）。没配这个 Secret 时，check 阶段的镜像 copy 会失败，整条流水线会停在检查步骤。
 
-已知冲突：官方商店里 `cloud.lazycat.app.dmp` 已被其他开发者占用（v2.1.1，2025-08），所以本包改用 `community.lazycat.app.dmp`。
+已知冲突：官方商店里 `cloud.lazycat.app.dmp` 已被其他开发者占用（v2.1.1，2025-08），所以本包改用 `cloud.lazycat.app.dmp3`。
 
 ### Gitea 版本
 
