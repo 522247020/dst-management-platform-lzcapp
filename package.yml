@@ -6,6 +6,11 @@ author: miracleEverywhere
 license: MIT
 homepage: https://github.com/miracleEverywhere/dst-management-platform-api
 min_os_version: 1.5.0
+# 只支持 PC（桌面/浏览器）端：移动端与智慧屏点击图标会提示不支持
+unsupported_platforms:
+  - android
+  - ios
+  - tvos
 permissions:
   required:
     - net.internet

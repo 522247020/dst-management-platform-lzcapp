@@ -7,6 +7,7 @@
 - 本地开发目录：`~/Code/dst-management-platform-lzcapp`
 - 子域名：`dmp.<微服域名>`，例如 `https://dmp.lc03test.heiyu.space`
 - 镜像：`ghcr.io/miracleeverywhere/dst-management-platform-api:v*`（上游只提供 linux/amd64）
+- 平台：只支持 PC（`unsupported_platforms: [android, ios, tvos]`），移动端与智慧屏点击会提示不支持
 
 ## 目录
 
