@@ -2,7 +2,7 @@
 
 把 [miracleEverywhere/dst-management-platform-api](https://github.com/miracleEverywhere/dst-management-platform-api) 打包成懒猫微服 LPK，并用 GitHub Actions 自动跟随上游镜像版本发布。
 
-- 包名：`cloud.lazycat.app.dmp`
+- 包名：`community.lazycat.app.dmp`（`cloud.lazycat.app.dmp` 已被别人占用）
 - 仓库：<https://github.com/522247020/dst-management-platform-lzcapp>
 - 本地开发目录：`~/Code/dst-management-platform-lzcapp`
 - 子域名：`dmp.<微服域名>`，例如 `https://dmp.lc03test.heiyu.space`
@@ -18,6 +18,8 @@ lzc-icon.png                应用图标（由上游 dmp.svg 转换）
 .github/lazycat-action.yml      ca-x/lazycat-github-action 的版本跟踪配置
 .github/workflows/lazycat.yml   GitHub Actions 流水线（reusable workflow）
 docs/gitea-actions/build-lpk.yml  Gitea 版 composite 流水线（参考，已不在默认分支运行）
+content/lazycat-injects/    网盘文件选择器注入脚本（打包进 /lzcapp/pkg/content）
+.github/screenshots/        商店截图
 dist/                       构建产物（已 gitignore）
 ```
 
@@ -60,6 +62,31 @@ ssh <box> 'lpk-manager install /tmp/dmp.lpk'
 1. **同一端口只能给一个应用/实例用**：端口号按应用子域名分发，若同一微服上还有别的应用声明了同一段 UDP 端口，会冲突。
 2. **Klei 大厅联机**：DST 服务器向 Klei 注册的是它自己看到的公网出口 IP。微服在 NAT 后面时，想让公网玩家通过大厅加入，仍需要在路由器上把相同 UDP 端口映射到微服；否则只能局域网/直连（`dmp.<微服域名>:端口`）玩。
 
+## 微服集成（inject，无 OIDC）
+
+### 免密登录
+
+三阶段 inject，账号密码只在业务成功时落盘，登录页自动填充并提交：
+
+| 阶段 | inject | 行为 |
+| --- | --- | --- |
+| request | `dmp-capture-credentials` | 抓 `POST /v3/user/register`、`POST /v3/user/login`、`PUT /v3/user/myself` 里的 `username` / `password` |
+| response | `dmp-commit-credentials` | 仅当 HTTP 2xx 且响应体 `code == 200` 时写 `ctx.persist`（按微服用户隔离） |
+| browser | `dmp-login-autofill` | `#/login*` 命中后填充 `input.v-field__input[type=text]` 与 `input[autocomplete=password]`，`autoSubmit` 自动登录 |
+
+首次注册管理员、之后改密都会自动更新保存的凭据；没接 OIDC，也不改上游代码。
+
+### 文件拦截（网盘打开/保存）
+
+| 阶段 | inject | 行为 |
+| --- | --- | --- |
+| request | `lazycat-file-bridge` | `/__lazycat_file_bridge/*` 同源桥接到 `https://file.<微服域名>/files/home`，保留 Cookie 与 `Owner`，只放行 GET/HEAD/PUT |
+| browser | `lazycat-file-chooser` | 接管 `<input type=file>`、`showOpenFilePicker/showSaveFilePicker`、`blob:` 下载链接，弹出「网盘文件 / 本地文件」选择器 |
+
+所以「存档导入」里选文件时可以直接从懒猫网盘挑 ZIP，备份下载也能直接存到网盘。脚本来自官方 `lzc-file-chooser-inject.js`，放在 `content/lazycat-injects/` 打包进镜像内容目录。
+
+> 没有配 `application.file_handler`：DMP 没有「按文件路径打开」的路由，声明 MIME 会抢走系统里所有 `.zip` 的打开方式却没有对应页面。
+
 ## 自动化（GitHub Actions）
 
 `.github/workflows/lazycat.yml` 调用 `ca-x/lazycat-github-action` 的 reusable workflow：
@@ -97,13 +124,18 @@ ssh <box> 'lpk-manager install /tmp/dmp.lpk'
 
 要让流水线自动装盒，把 `docs/gitea-actions/build-lpk.yml` 里的“安装到微服”步骤搬到 GitHub workflow，并配置 `LAZYCAT_BOX_HOST` / `LAZYCAT_BOX_SSH_KEY`。
 
-### 发布到商店
+### 发布到商店（官方商店，自动）
 
-`direct` 交付只适合自用/内测。要提交官方商店或喵喵商店：
+`.github/lazycat-action.yml` 已开启官方商店：
 
-1. 把镜像复制到懒猫官方源（`lzc-cli appstore copy-image`），或把 `delivery.mode` 改成 `lazycat` 并为 Runner 配 `LZC_API_TOKEN`；
-2. 官方商店要求 `lzc-cli lpk lint` 无 warning，且 `services.*.image` 以 `registry.lazycat.cloud` 开头；
-3. 私有商店要求 LPK 下载地址是 GitHub Release Asset —— 现在就满足（`versioned-release-asset: true`），配 `APPSTORE_URL` / `APPSTORE_TOKEN` 即可。
+- `images[].delivery.mode: lazycat`：check 时把上游镜像 copy 到 `registry.lazycat.cloud`，清单同步改写（官方商店只接受懒猫源镜像）；
+- `stores.official.enabled: true` + `create_if_missing: true`：首次运行自动建应用、传信息、传 LPK 并提审；
+- 应用信息与 5 张截图都在配置里（`.github/screenshots/`）；
+- `skip_if_version_exists: true`：已在线版本不重复提交。
+
+需要仓库 Secret `LZC_API_TOKEN`（懒猫开发者平台 → 个人访问令牌）。没配这个 Secret 时，check 阶段的镜像 copy 会失败，整条流水线会停在检查步骤。
+
+已知冲突：官方商店里 `cloud.lazycat.app.dmp` 已被其他开发者占用（v2.1.1，2025-08），所以本包改用 `community.lazycat.app.dmp`。
 
 ### Gitea 版本
 

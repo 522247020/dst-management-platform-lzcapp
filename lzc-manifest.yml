@@ -3,6 +3,107 @@ application:
   upstreams:
     - location: /
       backend: http://dmp:80
+  # ---------- 免密登录（inject 三阶段，不接 OIDC）----------
+  # request：抓取注册 / 登录 / 改密请求里的账号密码
+  injects:
+    - id: dmp-capture-credentials
+      auth_required: false
+      on: request
+      when:
+        - /v3/user/register
+        - /v3/user/login
+        - /v3/user/myself
+      do: |
+        const method = String(ctx.request.method || "").toUpperCase();
+        if (method !== "POST" && method !== "PUT") return;
+        let payload = null;
+        try { payload = ctx.body.getJSON(); } catch (e) { payload = null; }
+        if (!payload || typeof payload !== "object") return;
+        const pick = (...values) => values.find((v) => typeof v === "string" && v.length > 0) || "";
+        const username = pick(payload.username, payload.Username);
+        const password = pick(payload.password, payload.Password, payload.newPassword);
+        if (username) ctx.flow.set("dmp.username", username);
+        if (password) ctx.flow.set("dmp.password", password);
+
+    # response：只有业务成功（code=200）才落盘，避免失败请求污染
+    - id: dmp-commit-credentials
+      auth_required: false
+      on: response
+      when:
+        - /v3/user/register
+        - /v3/user/login
+        - /v3/user/myself
+      do: |
+        if (ctx.status < 200 || ctx.status >= 300) return;
+        if (!ctx.safe_uid) return;
+        let payload = null;
+        try { payload = ctx.body.getJSON(); } catch (e) { payload = null; }
+        if (!payload || payload.code !== 200) return;
+        const username = ctx.flow.get("dmp.username");
+        const password = ctx.flow.get("dmp.password");
+        if (typeof username === "string" && username) ctx.persist.set("dmp.username", username);
+        if (typeof password === "string" && password) ctx.persist.set("dmp.password", password);
+
+    # browser：登录页自动填充并自动提交
+    - id: dmp-login-autofill
+      when:
+        - /#/login*
+      do:
+        - src: builtin://simple-inject-password
+          params:
+            user:
+              $persist: dmp.username
+            password:
+              $persist: dmp.password
+            userSelector: input.v-field__input[type="text"]
+            passwordSelector: input[autocomplete="password"]
+            autoSubmit: true
+            submitDelayMs: 500
+
+    # ---------- 文件拦截（网盘打开/保存）----------
+    # 同源文件桥：把 /__lazycat_file_bridge/* 转发到当前微服的网盘服务
+    - id: lazycat-file-bridge
+      on: request
+      when:
+        - /__lazycat_file_bridge/*
+      do: |
+        const bridgePrefix = "/__lazycat_file_bridge";
+        const requestHost = String(ctx.request.host || "").split(":")[0].toLowerCase();
+        const firstDot = requestHost.indexOf(".");
+        const method = String(ctx.request.method || "").toUpperCase();
+
+        if (firstDot <= 0 || !requestHost.endsWith(".heiyu.space") || !["GET", "HEAD", "PUT"].includes(method)) {
+          ctx.response.send(["GET", "HEAD", "PUT"].includes(method) ? 400 : 405, "Invalid LazyCat file bridge request");
+          return;
+        }
+
+        const boxDomain = requestHost.slice(firstDot + 1);
+        const fileOrigin = "https://file." + boxDomain;
+        const targetPath = "/files/home" + ctx.request.path.slice(bridgePrefix.length);
+
+        ctx.headers.del("Origin");
+        ctx.headers.del("Referer");
+        ctx.proxy.to(fileOrigin, {
+          path: targetPath,
+          query: ctx.request.raw_query,
+          use_target_host: true,
+          timeout_ms: 120000,
+          on_fail: "error",
+        });
+
+    # browser：接管 <input type=file>、showOpenFilePicker/showSaveFilePicker、blob 下载链接
+    - id: lazycat-file-chooser
+      on: browser
+      when:
+        - /*
+      do:
+        - src: file:///lzcapp/pkg/content/lazycat-injects/lzc-file-chooser-inject.js
+          params:
+            diskRoot: /_lzc/files/home
+            fileBridgeRoot: /__lazycat_file_bridge
+            fallbackMime: application/octet-stream
+            locale: auto
+
   # DST 世界端口与主服务器端口按 UDP 对外转发。
   # 不写 port 时，外部入站端口号原样转发到容器内同名端口，DMP 的端口规划才能成立。
   ingress:

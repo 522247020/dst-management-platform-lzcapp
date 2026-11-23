@@ -29,4 +29,9 @@ jobs:
       version: ${{ github.event.inputs.version }}
       # 产物固定为 <package-id>-v<version>.lpk，供 Release 与商店复用
       versioned-release-asset: true
+    secrets:
+      # 官方商店：开发者平台 PAT（懒猫开发者平台 → 个人访问令牌）
+      LZC_API_TOKEN: ${{ secrets.LZC_API_TOKEN }}
+      # 仅测试环境需要覆盖；生产留空
+      LZC_API_HOST: ${{ secrets.LZC_API_HOST }}
     # stores 未启用，因此不映射 LZC_API_TOKEN / APPSTORE_* 等凭据

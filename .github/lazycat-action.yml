@@ -40,10 +40,33 @@ images:
     # 只要 v1.2.3 这类正式版本，排除 v1.2.3-pre、master、latest、commit sha
     tag_regex: '^v\d+\.\d+\.\d+$'
     delivery:
-      mode: direct
+      # 官方商店要求运行时镜像来自 registry.lazycat.cloud；
+      # lazycat 模式会在 check 时把上游镜像 copy 到懒猫官方源（需要 LZC_API_TOKEN）
+      mode: lazycat
 
 stores:
   official:
-    enabled: false
+    enabled: true
+    # 首次提交时自动创建应用并与当前用户关联，后续只追加版本
+    create_if_missing: true
+    continue_if_newer_version: true
+    skip_if_version_exists: true
+    changelog_locales: [zh, en]
+    application:
+      language: zh
+      name: 饥荒管理平台
+      brief: 饥荒联机版开服面板，多房间、模组、玩家与存档一站管理
+      description: "饥荒管理平台（DMP）是饥荒联机版（Don't Starve Together）的服务器管理面板：一站式安装游戏与 SteamCMD、多房间多世界开服、创意工坊模组管理、玩家与权限管理、地图预览、备份与定时通知、日志管理。应用已接入微服账户体系（免密登录）与网盘文件选择器，存档可以直接从懒猫网盘导入导出。"
+      keywords: 饥荒,Don't Starve Together,DST,游戏服务器,开服,面板
+      source: https://github.com/miracleEverywhere/dst-management-platform-api
+      source_author: miracleEverywhere
+      support_pc: true
+      support_mobile: false
+      screenshot_pc_files:
+        - .github/screenshots/pc-1-login.png
+        - .github/screenshots/pc-2-overview.png
+        - .github/screenshots/pc-3-users.png
+        - .github/screenshots/pc-4-settings.png
+        - .github/screenshots/pc-5-install.png
   private:
     enabled: false
