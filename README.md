@@ -3,6 +3,8 @@
 把 [miracleEverywhere/dst-management-platform-api](https://github.com/miracleEverywhere/dst-management-platform-api) 打包成懒猫微服 LPK，并用 Gitea Actions 自动跟随上游镜像版本发布。
 
 - 包名：`cloud.lazycat.app.dmp`
+- 代码与发布：<http://192.168.3.153:3000/mhwy/dst-management-platform-lzcapp>
+- 本地开发目录：`~/Code/dst-management-platform-lzcapp`
 - 子域名：`dmp.<微服域名>`，例如 `https://dmp.lc03test.heiyu.space`
 - 镜像：`ghcr.io/miracleeverywhere/dst-management-platform-api:v*`（上游只提供 linux/amd64）
 
@@ -83,6 +85,10 @@ ssh <box> 'lpk-manager install /tmp/dmp.lpk'
 | `LAZYCAT_BOX_SSH_PORT` | SSH 端口 |
 
 Release 只用 Gitea 自带的 `github.token`，不需要额外 token。
+
+Runner 拉不到 GitHub Release 时，可以把 `lazycat-action_linux_amd64.tar.gz` 与 `checksums.txt` 镜像到内网，并在仓库变量 `LAZYCAT_ACTION_RELEASE_BASE_URL` 里填下载目录（例如 Gitea Release 的 `.../releases/download/<tag>`）。该变量为空时回退到 GitHub。
+
+注意：家里那台 Gitea（`192.168.124.254:6600`）开启了“必须登录才能浏览”，匿名拉 Release 资源是 404，不适合做公开分发；这里用的是 `192.168.3.153:3000`。
 
 ### 发布到商店的后续改动
 
