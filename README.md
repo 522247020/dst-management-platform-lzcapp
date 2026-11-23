@@ -5,7 +5,7 @@
 - 包名：`cloud.lazycat.app.dmp3`（`cloud.lazycat.app.dmp` 已被别人占用）
 - 仓库：<https://github.com/522247020/dst-management-platform-lzcapp>
 - 本地开发目录：`~/Code/dst-management-platform-lzcapp`
-- 子域名：`dmp.<微服域名>`，例如 `https://dmp.lc03test.heiyu.space`
+- 子域名：`dmp3.<微服域名>`，例如 `https://dmp3.mmm.heiyu.space`
 - 镜像：`ghcr.io/miracleeverywhere/dst-management-platform-api:v*`（上游只提供 linux/amd64）
 - 平台：只支持 PC（`unsupported_platforms: [android, ios, tvos]`），移动端与智慧屏点击会提示不支持
 
@@ -53,15 +53,18 @@ ssh <box> 'lpk-manager install /tmp/dmp.lpk'
 | `/root/dmp_files` | `/lzcapp/var/dmp_files` | LuaJIT、插件等运行时文件 |
 | `/root/steamcmd` | `/lzcapp/var/steamcmd` | SteamCMD，持久化后不每次重下 |
 
-### 网络端口
+### 网络端口（host 网络）
 
-- HTTP：走懒猫路由，`/=http://dmp:80`，由微服做鉴权与 HTTPS。
-- UDP：`application.ingress` 把外部 `11000-12000`、`21000-21100` 原样转发到容器内同名端口，对应 DMP 的世界端口（默认 11001 起）和主服务器端口（默认 21001 起）。
+DST 服务端只支持 IPv4，而懒猫的 4 层 ingress 走的是微服的 IPv6/虚拟外部地址，游戏连不上。所以 `services.dmp` 用 `network_mode: host`，直接占用宿主端口：
 
-对外地址形如 `dmp.<微服域名>:11001`。注意两点：
+- Web：容器内 `DMP_PORT=9898`，宿主 `0.0.0.0:9898`；懒猫路由指向 `http://172.18.0.1:9898`（宿主 docker 网桥），对外仍是 `https://dmp3.<微服域名>`。
+- 游戏：DMP 启动世界时直接在宿主上监听 UDP `11000-12000`（世界端口）和 `21000-21100`（主服务器端口），IPv4 直通，不再经过 ingress。
+- 因此 `lzc-manifest.yml` 里没有 `application.ingress`；创建房间后 `ss -lunp` 能看到宿主上的 UDP 端口。
 
-1. **同一端口只能给一个应用/实例用**：端口号按应用子域名分发，若同一微服上还有别的应用声明了同一段 UDP 端口，会冲突。
-2. **Klei 大厅联机**：DST 服务器向 Klei 注册的是它自己看到的公网出口 IP。微服在 NAT 后面时，想让公网玩家通过大厅加入，仍需要在路由器上把相同 UDP 端口映射到微服；否则只能局域网/直连（`dmp.<微服域名>:端口`）玩。
+注意两点：
+
+1. **9898 端口在局域网内是直接可达的**（宿主 0.0.0.0），只是没有微服的统一登录，DMP 自己的账号密码仍然生效；不要在公网直接暴露这个端口。
+2. **Klei 大厅/公网联机**：想让公网玩家通过大厅加入，仍需在路由器把相同 UDP 端口映射到微服的局域网 IP（例如 `192.168.3.198`）；局域网玩家直接连 `192.168.3.198:端口` 即可。
 
 ## 微服集成（inject，无 OIDC）
 
