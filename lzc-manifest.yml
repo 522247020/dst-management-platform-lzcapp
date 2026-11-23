@@ -1,0 +1,45 @@
+application:
+  subdomain: dmp
+  upstreams:
+    - location: /
+      backend: http://dmp:80
+  # DST 世界端口与主服务器端口按 UDP 对外转发。
+  # 不写 port 时，外部入站端口号原样转发到容器内同名端口，DMP 的端口规划才能成立。
+  ingress:
+    - protocol: udp
+      description: 饥荒世界端口（DMP 默认从 11001 起分配）
+      service: dmp
+      publish_port: 11000-12000
+    - protocol: udp
+      description: 饥荒主服务器端口（DMP 默认从 21001 起分配）
+      service: dmp
+      publish_port: 21000-21100
+
+services:
+  dmp:
+    image: ghcr.io/miracleeverywhere/dst-management-platform-api:v3.2.2
+    environment:
+      - TZ=Asia/Shanghai
+      - DMP_PORT=80
+      - DMP_IN_CONTAINER=1
+      - LEVEL=info
+    binds:
+      # 与上游 docker-compose.yml 的挂载一一对应，全部落在应用持久目录里
+      - /lzcapp/var/klei:/root/.klei
+      - /lzcapp/var/data:/root/data
+      - /lzcapp/var/dst:/root/dst
+      - /lzcapp/var/logs:/root/logs
+      - /lzcapp/var/dmp_files:/root/dmp_files
+      # 上游 entrypoint 每次启动都会解压 steamcmd，持久化后不重复下载
+      - /lzcapp/var/steamcmd:/root/steamcmd
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - --spider
+        - http://127.0.0.1:80/
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

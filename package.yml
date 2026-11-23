@@ -1,0 +1,18 @@
+package: cloud.lazycat.app.dmp
+version: 3.2.2
+name: 饥荒管理平台
+description: 饥荒联机版（DST）服务器管理平台，多房间、多用户、模组与存档管理
+author: miracleEverywhere
+license: MIT
+homepage: https://github.com/miracleEverywhere/dst-management-platform-api
+min_os_version: 1.5.0
+permissions:
+  required:
+    - net.internet
+locales:
+  zh-CN:
+    name: 饥荒管理平台
+    description: 饥荒联机版（DST）服务器管理平台，多房间、多用户、模组与存档管理
+  en-US:
+    name: DMP (DST Management Platform)
+    description: Don't Starve Together server management platform with multi-room, multi-user, mod and save management

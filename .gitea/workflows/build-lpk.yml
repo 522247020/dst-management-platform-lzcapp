@@ -1,0 +1,122 @@
+name: 构建懒猫 LPK
+
+on:
+  # 每天检查上游 GHCR 是否发布了新的 v* 镜像
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "指定版本号（例如 3.2.2，不带 v）；留空则自动检查上游镜像"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lpk-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 检查上游镜像版本
+        id: check
+        uses: https://github.com/ca-x/lazycat-github-action@v1
+        with:
+          operation: check
+          config: .github/lazycat-action.yml
+          version: ${{ github.event.inputs.version }}
+          dry-run: "false"
+
+      - name: 提交版本变更
+        if: ${{ steps.check.outputs.changed == 'true' }}
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "lzc-ci"
+          git config user.email "lzc-ci@users.noreply.local"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "没有需要提交的变更"
+            exit 0
+          fi
+          git commit -m "chore: 更新到 ${VERSION}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: 构建 LPK
+        id: build
+        uses: https://github.com/ca-x/lazycat-github-action@v1
+        with:
+          operation: build
+          config: .github/lazycat-action.yml
+          version: ${{ steps.check.outputs.version }}
+          changelog-template: "更新至 {{.Version}}"
+
+      - name: 准备 Release 文件
+        env:
+          VERSION: ${{ steps.build.outputs.version }}
+          LPK_PATH: ${{ steps.build.outputs.lpk-path }}
+          CHANGELOG: ${{ steps.build.outputs.changelog }}
+        run: |
+          set -euo pipefail
+          asset="dist/cloud.lazycat.app.dmp-v${VERSION}.lpk"
+          cp "$LPK_PATH" "$asset"
+          echo "LPK: $asset"
+          echo "SHA256: ${{ steps.build.outputs.sha256 }}"
+
+          # 优先用上游 GitHub Release 的更新说明；取不到就退回简洁说明
+          notes=""
+          if command -v python3 >/dev/null 2>&1; then
+            notes="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/miracleEverywhere/dst-management-platform-api/releases/tags/v${VERSION}" \
+              | python3 -c 'import json,sys; print(json.load(sys.stdin).get("body") or "")' 2>/dev/null || true)"
+          fi
+          if [ -z "${notes//[[:space:]]/}" ]; then
+            notes="${CHANGELOG:-更新至 v${VERSION}}"
+          fi
+          printf '%s\n' "$notes" > dist/release-notes.md
+
+      - name: 上传到 Gitea Release
+        uses: https://github.com/akkuman/gitea-release-action@v1
+        with:
+          tag_name: v${{ steps.build.outputs.version }}
+          name: v${{ steps.build.outputs.version }}
+          body_path: dist/release-notes.md
+          target_commitish: ${{ github.ref_name }}
+          files: |
+            dist/cloud.lazycat.app.dmp-v${{ steps.build.outputs.version }}.lpk
+          sha256sum: true
+
+      # 可选：配置了 LAZYCAT_BOX_HOST / LAZYCAT_BOX_SSH_KEY 时自动安装到微服
+      - name: 安装到微服
+        if: ${{ steps.check.outputs.changed == 'true' }}
+        env:
+          BOX_HOST: ${{ secrets.LAZYCAT_BOX_HOST }}
+          BOX_USER: ${{ secrets.LAZYCAT_BOX_USER }}
+          BOX_PORT: ${{ secrets.LAZYCAT_BOX_SSH_PORT }}
+          BOX_SSH_KEY: ${{ secrets.LAZYCAT_BOX_SSH_KEY }}
+          VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BOX_HOST}" ] || [ -z "${BOX_SSH_KEY}" ]; then
+            echo "未配置 LAZYCAT_BOX_HOST / LAZYCAT_BOX_SSH_KEY，跳过安装"
+            exit 0
+          fi
+          npm install -g @lazycatcloud/lzc-cli@2.0.9 >/dev/null
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$BOX_SSH_KEY" | sed 's/\r$//' > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          address="${BOX_HOST}"
+          if [ -n "${BOX_PORT}" ]; then address="${BOX_HOST}:${BOX_PORT}"; fi
+          lzc-cli box add-by-ssh "${BOX_USER:-root}" "${address}"
+          lzc-cli lpk install "dist/cloud.lazycat.app.dmp-v${VERSION}.lpk" --apk n

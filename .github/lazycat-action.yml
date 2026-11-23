@@ -1,0 +1,41 @@
+version: 1
+
+project:
+  root: .
+  build_config: lzc-build.yml
+  package_file: package.yml
+  output: dist/application.lpk
+  # 上游镜像只有 linux/amd64，盒子也是 x86_64
+  target_arch: amd64
+
+update:
+  sync_homepage: true
+  sync_license: true
+  # Gitea 侧要产出 tag + Release，因此不能用 pull
+  strategy: publish
+  allow_downgrade: false
+  version_source:
+    type: image
+    image: dmp
+
+release:
+  use_github_release_notes: true
+  store_changelog_format: plain
+  changelog_template: "{{if .ReleaseNotes}}{{.ReleaseNotes}}{{else}}更新至 {{.Version}}{{end}}"
+
+images:
+  - id: dmp
+    target: service
+    service: dmp
+    source: ghcr.io/miracleeverywhere/dst-management-platform-api
+    channel: stable
+    # 只要 v1.2.3 这类正式版本，排除 v1.2.3-pre、master、latest、commit sha
+    tag_regex: '^v\d+\.\d+\.\d+$'
+    delivery:
+      mode: direct
+
+stores:
+  official:
+    enabled: false
+  private:
+    enabled: false
