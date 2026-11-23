@@ -1,9 +1,9 @@
 # 饥荒管理平台（DMP）懒猫微服应用
 
-把 [miracleEverywhere/dst-management-platform-api](https://github.com/miracleEverywhere/dst-management-platform-api) 打包成懒猫微服 LPK，并用 Gitea Actions 自动跟随上游镜像版本发布。
+把 [miracleEverywhere/dst-management-platform-api](https://github.com/miracleEverywhere/dst-management-platform-api) 打包成懒猫微服 LPK，并用 GitHub Actions 自动跟随上游镜像版本发布。
 
 - 包名：`cloud.lazycat.app.dmp`
-- 代码与发布：<http://192.168.3.153:3000/mhwy/dst-management-platform-lzcapp>
+- 仓库：<https://github.com/522247020/dst-management-platform-lzcapp>
 - 本地开发目录：`~/Code/dst-management-platform-lzcapp`
 - 子域名：`dmp.<微服域名>`，例如 `https://dmp.lc03test.heiyu.space`
 - 镜像：`ghcr.io/miracleeverywhere/dst-management-platform-api:v*`（上游只提供 linux/amd64）
@@ -15,8 +15,9 @@ package.yml                 LPK 元数据（包名、版本、多语言、权限
 lzc-manifest.yml            运行结构：HTTP 路由、UDP ingress、挂载
 lzc-build.yml               构建配置
 lzc-icon.png                应用图标（由上游 dmp.svg 转换）
-.github/lazycat-action.yml  ca-x/lazycat-github-action 的版本跟踪配置
-.gitea/workflows/build-lpk.yml  Gitea Actions 流水线
+.github/lazycat-action.yml      ca-x/lazycat-github-action 的版本跟踪配置
+.github/workflows/lazycat.yml   GitHub Actions 流水线（reusable workflow）
+docs/gitea-actions/build-lpk.yml  Gitea 版 composite 流水线（参考，已不在默认分支运行）
 dist/                       构建产物（已 gitignore）
 ```
 
@@ -59,67 +60,59 @@ ssh <box> 'lpk-manager install /tmp/dmp.lpk'
 1. **同一端口只能给一个应用/实例用**：端口号按应用子域名分发，若同一微服上还有别的应用声明了同一段 UDP 端口，会冲突。
 2. **Klei 大厅联机**：DST 服务器向 Klei 注册的是它自己看到的公网出口 IP。微服在 NAT 后面时，想让公网玩家通过大厅加入，仍需要在路由器上把相同 UDP 端口映射到微服；否则只能局域网/直连（`dmp.<微服域名>:端口`）玩。
 
-## 自动化（Gitea Actions）
+## 自动化（GitHub Actions）
 
-`.gitea/workflows/build-lpk.yml`：
+`.github/workflows/lazycat.yml` 调用 `ca-x/lazycat-github-action` 的 reusable workflow：
 
-1. 每天 03:17（cron）或手动触发。
-2. 用 `ca-x/lazycat-github-action@v1` 的 composite Action 执行 `operation: check`：
-   - 从 GHCR 读取 `v*` 正式版本 tag；
-   - 选出比当前 `package.yml` 新的版本，改写 `package.yml` 与 `lzc-manifest.yml` 的镜像 tag；
-   - 顺带构建一次 LPK 做校验。
-3. 有变更时提交回默认分支。
-4. 执行 `operation: build` 产出 LPK，复制为 `dist/cloud.lazycat.app.dmp-v<version>.lpk`。
-5. 用 `akkuman/gitea-release-action` 创建 `v<version>` Release 并上传 LPK 与 `.sha256`。
-6. 若配置了微服 SSH Secrets，则用 `lzc-cli lpk install` 自动升级到目标微服。
-
-版本发现规则在 `.github/lazycat-action.yml`：`channel: stable` + `tag_regex: '^v\d+\.\d+\.\d+$'` + `delivery.mode: direct`（清单直接引用 `ghcr.io`，不需要任何镜像仓库凭据），`target_arch: amd64`。
-
-### 需要配置的 Secrets（都可选）
-
-| Secret | 用途 |
+| 项 | 值 |
 | --- | --- |
-| `LAZYCAT_BOX_HOST` | 目标微服的 SSH 地址，配置后才会自动安装 |
-| `LAZYCAT_BOX_SSH_KEY` | 目标微服的部署私钥 |
-| `LAZYCAT_BOX_USER` | SSH 用户，默认 `root` |
-| `LAZYCAT_BOX_SSH_PORT` | SSH 端口 |
+| 触发 | 每天 03:17（cron）、手动 dispatch |
+| 版本源 | GHCR 上的 `v*` 正式 tag（`^v\d+\.\d+\.\d+$`） |
+| 策略 | `publish`：改 `package.yml` + `lzc-manifest.yml` → 提交 → 打 tag → 建 Release |
+| 产物 | `cloud.lazycat.app.dmp-v<version>.lpk`（`versioned-release-asset: true`） |
+| 交付 | `direct`，清单直接引用 `ghcr.io`，不需要镜像仓库凭据 |
+| 保留 | Release 最多保留 1000 条（`release.cleanup`） |
 
-Release 只用 Gitea 自带的 `github.token`，不需要额外 token。
+手动指定版本：
 
-Runner 拉不到 GitHub Release 时，可以把 `lazycat-action_linux_amd64.tar.gz` 与 `checksums.txt` 镜像到内网，并在仓库变量 `LAZYCAT_ACTION_RELEASE_BASE_URL` 里填下载目录（例如 Gitea Release 的 `.../releases/download/<tag>`）。该变量为空时回退到 GitHub。
-
-注意：家里那台 Gitea（`192.168.124.254:6600`）开启了“必须登录才能浏览”，匿名拉 Release 资源是 404，不适合做公开分发；这里用的是 `192.168.3.153:3000`。
-
-### 发布到商店的后续改动
-
-`direct` 交付只适合自用/内测。要提交官方商店或喵喵商店，需要：
-
-1. 把镜像复制到懒猫官方源（`lzc-cli appstore copy-image`），或把 `delivery.mode` 改成 `lazycat` 并给 Runner 配 `LZC_API_TOKEN`；
-2. 官方商店要求 `lzc-cli lpk lint` 无 warning，且 `services.*.image` 以 `registry.lazycat.cloud` 开头；
-3. 私有商店要求 LPK 下载地址是真实的 GitHub Release Asset，Gitea Release 地址会被拒绝 —— 这一步需要把发布仓放到 GitHub，或者在 GitHub 上再建一个发布仓。
-
-## 在 GitHub 上跑
-
-同一份 `package.yml` / `lzc-manifest.yml` / `.github/lazycat-action.yml` 可以直接用官方 reusable workflow：
-
-```yaml
-# .github/workflows/lazycat.yml
-name: LazyCat LPK
-on:
-  schedule:
-    - cron: "17 3 * * *"
-  workflow_dispatch:
-permissions:
-  contents: write
-  pull-requests: write
-jobs:
-  lazycat:
-    uses: ca-x/lazycat-github-action/.github/workflows/lazycat.yml@v1
-    with:
-      operation: auto
-      config: .github/lazycat-action.yml
-      versioned-release-asset: true
+```bash
+gh workflow run lazycat.yml -f version=3.2.2
 ```
+
+配置细节都在 `.github/lazycat-action.yml`。当前 `stores` 全部关闭，所以不需要任何 Secret。
+
+### 装到微服
+
+流水线只发 Release。装机可以：
+
+```bash
+# 方式一：开发机有授权
+gh release download v3.2.2 -R 522247020/dst-management-platform-lzcapp -p '*.lpk'
+lzc-cli lpk install cloud.lazycat.app.dmp-v3.2.2.lpk --apk n
+
+# 方式二：盒子上直接装（不需要开发者工具授权）
+scp cloud.lazycat.app.dmp-v3.2.2.lpk <box>:/tmp/dmp.lpk
+ssh <box> 'lpk-manager install /tmp/dmp.lpk'
+```
+
+要让流水线自动装盒，把 `docs/gitea-actions/build-lpk.yml` 里的“安装到微服”步骤搬到 GitHub workflow，并配置 `LAZYCAT_BOX_HOST` / `LAZYCAT_BOX_SSH_KEY`。
+
+### 发布到商店
+
+`direct` 交付只适合自用/内测。要提交官方商店或喵喵商店：
+
+1. 把镜像复制到懒猫官方源（`lzc-cli appstore copy-image`），或把 `delivery.mode` 改成 `lazycat` 并为 Runner 配 `LZC_API_TOKEN`；
+2. 官方商店要求 `lzc-cli lpk lint` 无 warning，且 `services.*.image` 以 `registry.lazycat.cloud` 开头；
+3. 私有商店要求 LPK 下载地址是 GitHub Release Asset —— 现在就满足（`versioned-release-asset: true`），配 `APPSTORE_URL` / `APPSTORE_TOKEN` 即可。
+
+### Gitea 版本
+
+`docs/gitea-actions/build-lpk.yml` 是 Gitea Actions 的 composite 版（check → 提交 → build → `akkuman/gitea-release-action`，可选 `lzc-cli` 装盒），放在 `docs/` 下不会被误触发。经验值：
+
+- Gitea 上只能用 composite Action，reusable workflow 是 GitHub 专属；
+- Action 启动要从 GitHub Release 下 6 MB 二进制，慢网会 60s 超时，可用仓库变量 `LAZYCAT_ACTION_RELEASE_BASE_URL` 指到内网镜像；
+- Gitea 发给 Action 的 `GITHUB_TOKEN` 是 Gitea token，查上游 release notes 会 401 并回退模板；
+- Gitea 的 Release 地址不是 GitHub 地址，私有商店会拒绝。
 
 ## 许可
 

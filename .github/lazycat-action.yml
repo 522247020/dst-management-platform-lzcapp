@@ -9,9 +9,10 @@ project:
   target_arch: amd64
 
 update:
-  sync_homepage: true
+  # 仓库 Website 不去抢上游主页，保持不动
+  sync_homepage: false
   sync_license: true
-  # Gitea 侧要产出 tag + Release，因此不能用 pull
+  # 要产出 tag + GitHub Release，因此不能用 pull
   strategy: publish
   allow_downgrade: false
   version_source:
@@ -19,9 +20,16 @@ update:
     image: dmp
 
 release:
+  cleanup:
+    enabled: true
+    keep_latest: 1000
   use_github_release_notes: true
   store_changelog_format: plain
   changelog_template: "{{if .ReleaseNotes}}{{.ReleaseNotes}}{{else}}更新至 {{.Version}}{{end}}"
+
+build:
+  # lzc-build.yml 没有 buildscript
+  run_buildscript: false
 
 images:
   - id: dmp

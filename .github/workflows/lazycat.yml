@@ -1,0 +1,32 @@
+name: LazyCat LPK
+
+on:
+  # 每天检查上游 GHCR 是否发布了新的 v* 镜像
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "指定版本号（例如 3.2.2，不带 v）；留空则自动检查上游镜像"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: lazycat-lpk
+  cancel-in-progress: false
+
+jobs:
+  lazycat:
+    # 完整自动化：工具链、版本检查、提交/PR、Artifact、tag、Release、Release Asset、商店
+    uses: ca-x/lazycat-github-action/.github/workflows/lazycat.yml@v1
+    with:
+      operation: auto
+      config: .github/lazycat-action.yml
+      version: ${{ github.event.inputs.version }}
+      # 产物固定为 <package-id>-v<version>.lpk，供 Release 与商店复用
+      versioned-release-asset: true
+    # stores 未启用，因此不映射 LZC_API_TOKEN / APPSTORE_* 等凭据
