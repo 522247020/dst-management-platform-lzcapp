@@ -111,6 +111,9 @@ services:
       - DMP_PORT=9898
       - DMP_IN_CONTAINER=1
       - LEVEL=info
+    # 上游 DMP 写 appworkshop_322330.acf 时不会先建父目录，先把 ugc_mods 建好，避免 EnsureFileExists 失败
+    setup_script: |
+      mkdir -p /root/dst/ugc_mods
     binds:
       # 与上游 docker-compose.yml 的挂载一一对应，全部落在应用持久目录里
       - /lzcapp/var/klei:/root/.klei

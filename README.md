@@ -53,6 +53,8 @@ ssh <box> 'lpk-manager install /tmp/dmp.lpk'
 | `/root/dmp_files` | `/lzcapp/var/dmp_files` | LuaJIT、插件等运行时文件 |
 | `/root/steamcmd` | `/lzcapp/var/steamcmd` | SteamCMD，持久化后不每次重下 |
 
+启动前 `setup_script` 会补 `mkdir -p /root/dst/ugc_mods`：上游 DMP 写 `appworkshop_322330.acf` 时不建父目录，缺目录会报 `EnsureFileExists失败`。
+
 ### 网络端口（host 网络）
 
 DST 服务端只支持 IPv4，而懒猫的 4 层 ingress 走的是微服的 IPv6/虚拟外部地址，游戏连不上。所以 `services.dmp` 用 `network_mode: host`，直接占用宿主端口：
