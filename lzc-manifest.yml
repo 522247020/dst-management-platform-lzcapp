@@ -104,8 +104,8 @@ services:
   dmp:
     # 上游镜像只支持 IPv4 的 DST 服务端，必须让 DMP 直接占用宿主端口
     network_mode: host
-    # upstream: ghcr.io/miracleeverywhere/dst-management-platform-api:v3.2.2
-    image: registry.lazycat.cloud/mhwy/miracleeverywhere/dst-management-platform-api:794c7379418e6f9e
+    # upstream: ghcr.io/miracleeverywhere/dst-management-platform-api:v3.2.3
+    image: registry.lazycat.cloud/mhwy/miracleeverywhere/dst-management-platform-api:0cb040f6b88106e0
     environment:
       - TZ=Asia/Shanghai
       - DMP_PORT=9898
